@@ -7,6 +7,7 @@ extern crate tokio_core;
 extern crate serde_derive;
 extern crate serde_json as json;
 extern crate termion;
+extern crate itertools;
 
 use tokio_core::reactor::{Core, Handle};
 use futures::sink::Sink;
@@ -16,6 +17,8 @@ use websocket::result::WebSocketError;
 use websocket::{ClientBuilder, OwnedMessage};
 use websocket::Message;
 use std::io::{Write, stdout};
+use itertools::Itertools;
+use itertools::EitherOrBoth::{Both, Left, Right};
 
 const CONNECTION: &'static str = "wss://ws-api.coincheck.com/";
 
@@ -64,8 +67,12 @@ fn run(h: Handle) -> Result<(), WebSocketError> {
                 let ita = res.1;
                 write!(stdout, "{}{}{}", termion::cursor::Hide, termion::clear::All, termion::cursor::Goto(1, 1)).unwrap();
                 writeln!(stdout, "{:15}{:15}{:15}{:15}", "Ask", "Quantity", "Bid", "Quantity").unwrap();
-                for (ask, bid) in ita.asks.iter().zip(&ita.bids) {
-                    writeln!(stdout, "{:15}{:15}{:15}{:15}", ask.0, ask.1, bid.0, bid.1).unwrap();
+                for either_or_both in ita.asks.iter().zip_longest(&ita.bids) {
+                    match either_or_both {
+                        Left(ask) => writeln!(stdout, "{:15}{:15}{:15}{:15}", ask.0, ask.1, "", "").unwrap(),
+                        Right(bid) => writeln!(stdout, "{:15}{:15}{:15}{:15}", "", "", bid.0, bid.1).unwrap(),
+                        Both(ask, bid) => writeln!(stdout, "{:15}{:15}{:15}{:15}", ask.0, ask.1, bid.0, bid.1).unwrap(),
+                    }
                 }
                 stdout.flush().unwrap();
             }
